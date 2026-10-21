@@ -1,0 +1,216 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Orrery: Hand-Controlled Solar System</title>
+<style>
+:root{--bg:#02030a;--panel:#f6f7fcf0;--ink:#10132a;--mut:#4b5170;--line:#10132a26;--acc:#ff7a1a;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media(prefers-color-scheme:dark){:root:not([data-theme="light"]){--panel:#0b0e1cf0;--ink:#eef0ff;--mut:#9aa1c4;--line:#ffffff26}}
+:root[data-theme="dark"]{--panel:#0b0e1cf0;--ink:#eef0ff;--mut:#9aa1c4;--line:#ffffff26}
+html{scroll-padding-top:env(safe-area-inset-top,0px);height:100%;background:var(--bg)}
+body{margin:0;height:100%;background:var(--bg);color:var(--ink);font:15px/1.5 "Avenir Next","Trebuchet MS",system-ui,sans-serif;overflow:hidden}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:16px;backdrop-filter:blur(10px)}
+#cam{position:fixed;overflow:hidden;background:#05060c;display:grid;place-items:center;color:#9aa1c4}
+#cam video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;transform:scaleX(-1)}#pc{position:absolute;inset:0;width:100%;height:100%}
+#stage{position:fixed;background:var(--bg);touch-action:none;box-shadow:0 0 0 1px var(--line)}
+#ui{position:fixed;pointer-events:none;overflow:hidden}#ui>*{pointer-events:auto}
+#hud{position:absolute;top:calc(12px + env(safe-area-inset-top,0px));left:12px;padding:12px 14px;max-width:230px}
+#hud h1{margin:0;font-size:22px;letter-spacing:-.5px}#hud p{margin:2px 0 8px;color:var(--mut);font-size:13px}
+#hud label{display:block;font-size:13px;color:var(--mut)}#hud input[type=range]{width:100%;accent-color:var(--acc)}
+button{font:inherit;color:var(--ink);background:transparent;border:1px solid var(--line);border-radius:999px;padding:7px 13px;cursor:pointer}
+button:focus-visible,input:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
+#orb,#flt{margin-top:6px;font-size:13px;padding:4px 10px}#orb[aria-pressed=true]{background:var(--acc);border-color:var(--acc);color:#1a0b00}
+#flt{background:#00e5ff;border-color:#00e5ff;color:#001318;font-weight:700}
+#chips{position:absolute;left:0;right:0;bottom:0;display:flex;gap:8px;overflow-x:auto;padding:10px 12px calc(10px + env(safe-area-inset-bottom,0px))}
+#chips button{flex:none;display:flex;align-items:center;gap:7px;background:var(--panel);backdrop-filter:blur(10px)}
+#chips button:first-child{margin-left:auto}#chips button:last-child{margin-right:auto}
+#chips i{width:12px;height:12px;border-radius:50%;display:block}#chips .on{border-color:var(--acc);box-shadow:0 0 0 2px var(--acc)}
+#info{position:absolute;top:calc(12px + env(safe-area-inset-top,0px));right:12px;bottom:68px;width:min(340px,calc(100% - 24px));overflow:auto;padding:18px;box-sizing:border-box;transform:translateX(125%);transition:transform .55s cubic-bezier(.2,.8,.2,1)}
+#info.show{transform:none}
+#info h2{margin:0;font-size:34px;letter-spacing:-1px;line-height:1.1}#tag{color:var(--acc);font-weight:700;margin:2px 0 10px}
+#info p{margin:0 0 12px}#st{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:0 0 12px}
+#st div{border:1px solid var(--line);border-radius:10px;padding:6px 10px}#st dt{font-size:12px;color:var(--mut)}#st dd{margin:0;font-weight:700}
+#fun{border-left:3px solid var(--acc);padding-left:10px;color:var(--mut)}
+#wtbox{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:12px 0}#wtbox input{width:70px;font:inherit;padding:5px 8px;border-radius:8px;border:1px solid var(--line);background:transparent;color:var(--ink)}
+#back{width:100%;background:var(--acc);border-color:var(--acc);color:#1a0b00;font-weight:700}
+#tip{position:fixed;pointer-events:none;background:var(--panel);border:1px solid var(--line);padding:2px 9px;border-radius:8px;font-size:13px;display:none;z-index:9}
+#cur{position:fixed;left:0;top:0;width:30px;height:30px;margin:-15px 0 0 -15px;border:3px solid var(--acc);border-radius:50%;pointer-events:none;display:none;z-index:9;transition:transform .08s}
+#cur.pin{background:#ff7a1aaa;transform:scale(.6)}
+#gest{position:fixed;top:calc(12px + env(safe-area-inset-top,0px));left:12px;padding:6px 14px;font-size:14px;pointer-events:none;max-width:calc(100% - 24px);z-index:9}
+#start{position:fixed;inset:0;z-index:20;display:flex;align-items:center;justify-content:center;background:#02030acc;padding:24px;overflow:auto}
+#start .card{max-width:440px;padding:22px}#start h2{margin:0 0 6px;font-size:30px}#start ul{list-style:none;padding:0;margin:12px 0}#start li{margin:6px 0}#start .row{display:flex;gap:8px;flex-wrap:wrap}
+#go{background:var(--acc);border-color:var(--acc);color:#1a0b00;font-weight:700}
+@media(max-width:700px){#info{top:auto;right:12px;left:12px;width:auto;max-height:62%;transform:translateY(130%)}#info.show{transform:none}#hud{max-width:170px}}
+@media(prefers-reduced-motion:reduce){#info{transition:none}}
+</style></head><body>
+<div id="cam"><span>Your camera appears here</span><video id="vid" playsinline muted></video><canvas id="pc"></canvas></div>
+<div id="stage"></div>
+<div id="ui">
+<div id="hud" class="card"><h1>Orrery</h1><p id="hint">Use your hand, or the mouse.</p>
+<label>Time speed <span id="sv">×1</span><input id="spd" type="range" min="0" max="10" step=".5" value="1"></label>
+<button id="orb" aria-pressed="true">Orbit lines</button> <button id="flt" hidden>Float this planet</button></div>
+<aside id="info" class="card" aria-live="polite"><h2 id="nm"></h2><div id="tag"></div><p id="tx"></p><dl id="st"></dl><p id="fun"></p>
+<div id="wtbox"><label for="kg">Your weight (kg)</label><input id="kg" type="number" min="1" max="300" value="60"><strong id="wr"></strong></div>
+<button id="back">Back to the solar system</button></aside>
+<div id="chips"></div></div>
+<div id="tip"></div><div id="cur"></div><div id="gest" class="card">Mouse mode</div>
+<div id="start"><div class="card"><h2>Hand-controlled Orrery</h2><p>Camera on the left, solar system on the right. Allow camera access and hold a hand up in good light.</p><ul>
+<li>☝️ <b>Point at a planet</b> and hold for a moment: fly to it</li><li>🤏 <b>Pinch empty space and drag</b>: rotate the view</li>
+<li>🤏 <b>Pinch a planet and drag it left</b> onto your camera: it floats in front of you. Drag it back right to return it</li>
+<li>🙌 <b>Pinch with both hands</b>, then spread or close: zoom, or resize a floating planet</li>
+<li>✊ <b>Hold a fist</b>: back to the solar system</li><li>✌️ <b>Hold a peace sign</b>: next planet</li><li>🖐 <b>Hold an open palm</b>: pause or resume time</li></ul>
+<div class="row"><button id="go">Start hand control</button><button id="skip">Use mouse or touch</button></div></div></div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script>
+const $=id=>document.getElementById(id),R=Math.random,L=["Diameter","Day length","Year length","Moons","Temperature","Gravity"];
+const P=[
+{n:"Sun",r:7,d:0,spin:.08,g:27.9,tx:["#ff9d00",["#ffd23a","#ff5a00","#ffe680"],"r"],tag:"Our star",t:"A glowing ball of hydrogen and helium holding 99.8% of the solar system’s mass. Fusion in its core turns about four million tonnes of matter into light every second.",st:["1,391,000 km","~27 Earth days","230 million yr (galaxy orbit)","—","5,500 °C surface","27.9 g"],f:"You could fit about 1.3 million Earths inside it."},
+{n:"Mercury",r:.6,d:14,w:.3,spin:.3,g:.38,tx:["#8c8c8c",["#6b6b6b","#b0b0b0","#555"],"r"],tag:"The swift messenger",t:"The smallest planet and the closest to the Sun. With almost no atmosphere, its days scorch above 400 °C while its nights plunge below −170 °C.",st:["4,879 km","59 Earth days","88 days","0","167 °C avg","0.38 g"],f:"One Mercury day, sunrise to sunrise, lasts 176 Earth days, twice its year."},
+{n:"Venus",r:1,d:20,w:.22,spin:-.15,g:.9,tx:["#d9a441",["#e8c27a","#c98a2e","#f2d9a0"],"b"],tag:"The veiled furnace",t:"Wrapped in thick clouds of carbon dioxide and sulfuric acid, Venus has a runaway greenhouse effect that makes it the hottest planet, even hotter than Mercury.",st:["12,104 km","243 Earth days","225 days","0","464 °C","0.90 g"],f:"It spins backwards, so the Sun rises in the west."},
+{n:"Earth",r:1.1,d:27,w:.17,spin:.5,g:1,tilt:23,moon:1,tx:["#1d5fd1",["#2e8b3d","#3da04a","#f2f2f2"],"e"],tag:"The pale blue dot",t:"The only world known to have liquid oceans on its surface and life. Its magnetic field and atmosphere shield us from harsh solar radiation.",st:["12,742 km","24 hours","365.25 days","1","15 °C avg","1.00 g"],f:"About 71% of its surface is covered in water."},
+{n:"Mars",r:.8,d:34,w:.14,spin:.48,g:.38,tilt:25,tx:["#b5522d",["#8a3b1f","#d9824f","#6e2d17"],"r"],tag:"The red planet",t:"A cold desert world whose rusty color comes from iron oxide. It has the tallest volcano known, Olympus Mons, and a canyon system as long as the United States is wide.",st:["6,779 km","24.6 hours","687 days","2","−65 °C avg","0.38 g"],f:"Olympus Mons is about 2.5 times taller than Mount Everest."},
+{n:"Jupiter",r:3.2,d:52,w:.08,spin:.9,g:2.53,tilt:3,tx:["#d9b38c",["#b5835a","#f1e0c5","#9c5b3b","#e8c9a0"],"b"],tag:"The giant",t:"A ball of hydrogen and helium striped with storm clouds. Its Great Red Spot is a storm wider than Earth that has raged for centuries.",st:["139,820 km","9.9 hours","11.9 years","95+","−110 °C","2.53 g"],f:"It is more than twice as massive as all the other planets combined."},
+{n:"Saturn",r:2.7,d:72,w:.06,spin:.8,g:1.07,tilt:27,ring:1,tx:["#e3cf9f",["#cdb27a","#f0e2bd","#b89c64"],"b"],tag:"The ringed jewel",t:"Famous for its bright rings of ice and rock, Saturn is a gas giant so light that it would float in a big enough bathtub, since it is less dense than water.",st:["116,460 km","10.7 hours","29.5 years","146+","−140 °C","1.07 g"],f:"The rings span about 280,000 km yet are often only around ten metres thick."},
+{n:"Uranus",r:1.8,d:90,w:.043,spin:-.6,g:.89,tilt:98,tx:["#9fe3e6",["#86d1d6","#b8f0f2"],"b"],tag:"The sideways ice giant",t:"An ice giant that rolls around the Sun on its side, tilted about 98°. Methane in its atmosphere gives it a pale cyan color.",st:["50,724 km","17.2 hours","84 years","28","−195 °C","0.89 g"],f:"Each of its seasons lasts more than 20 years."},
+{n:"Neptune",r:1.7,d:106,w:.033,spin:.6,g:1.14,tilt:28,tx:["#2f55d8",["#264abf","#5c82f0","#1b3a9c"],"b"],tag:"The windy deep blue",t:"The most distant planet, a deep-blue ice giant with the fastest winds in the solar system, over 2,000 km/h.",st:["49,244 km","16.1 hours","165 years","16","−200 °C","1.14 g"],f:"It was found with mathematics before anyone saw it through a telescope, in 1846."}];
+// ---- scene ----
+const scene=new THREE.Scene(),camera=new THREE.PerspectiveCamera(50,1,.1,3000),renderer=new THREE.WebGLRenderer({antialias:true,alpha:true});
+renderer.setPixelRatio(Math.min(devicePixelRatio,2));const cv=renderer.domElement;cv.style.cssText="position:fixed;inset:0;width:100%;height:100%;pointer-events:none";$("stage").after(cv);
+const controls=new THREE.OrbitControls(camera,$("stage"));controls.enableDamping=true;controls.dampingFactor=.06;controls.autoRotateSpeed=.4;
+const fcam=new THREE.PerspectiveCamera(40,1,.1,100),fs=new THREE.Scene();fcam.position.z=10;let LR,SR;
+function layout(){const W=innerWidth,H=innerHeight,tall=W<=700||W<H*.9;
+ LR=tall?{x:0,y:0,w:W,h:H/2}:{x:0,y:0,w:W/2,h:H};SR=tall?{x:0,y:H/2,w:W,h:H/2}:{x:W/2,y:0,w:W/2,h:H};
+ [["cam",LR],["stage",SR],["ui",SR]].forEach(([id,r])=>Object.assign($(id).style,{left:r.x+"px",top:r.y+"px",width:r.w+"px",height:r.h+"px"}));
+ renderer.setSize(W,H,false);camera.aspect=SR.w/SR.h;camera.updateProjectionMatrix();fcam.aspect=W/H;fcam.updateProjectionMatrix();
+ const c=$("pc"),d=devicePixelRatio||1;c.width=Math.round(LR.w*d);c.height=Math.round(LR.h*d)}
+addEventListener("resize",layout);layout();
+const ov=()=>{const a=camera.aspect,k=a<1?.9/a:1;return new THREE.Vector3(0,70*k,130*k)};
+function tex(base,acc,mode){const c=document.createElement("canvas");c.width=512;c.height=256;const x=c.getContext("2d");x.fillStyle=base;x.fillRect(0,0,512,256);
+ if(mode=="b"){for(let i=0;i<46;i++){x.globalAlpha=.25+R()*.4;x.fillStyle=acc[i%acc.length];x.fillRect(0,R()*256,512,4+R()*18)}}
+ else{const e=mode=="e";for(let i=0;i<(e?70:120);i++){x.globalAlpha=e?.85:.28;x.fillStyle=acc[i%acc.length];x.beginPath();x.ellipse(R()*512,R()*256,6+R()*(e?30:14),4+R()*(e?18:14),0,0,7);x.fill()}}
+ x.globalAlpha=.08;for(let i=0;i<1500;i++){x.fillStyle=R()<.5?"#000":"#fff";x.fillRect(R()*512,R()*256,2,2)}return new THREE.CanvasTexture(c)}
+scene.add(new THREE.AmbientLight(0xffffff,.35));const sun=new THREE.PointLight(0xffffff,1.9,0,0);scene.add(sun);
+const lines=new THREE.Group();scene.add(lines);
+P.forEach(p=>{const T=tex(...p.tx),mat=p.d?new THREE.MeshStandardMaterial({map:T,roughness:1}):new THREE.MeshBasicMaterial({map:T});
+ p.mesh=new THREE.Mesh(new THREE.SphereGeometry(p.r,56,36),mat);p.holder=new THREE.Group();p.holder.rotation.z=(p.tilt||0)*Math.PI/180;p.holder.add(p.mesh);
+ if(p.d){p.holder.position.x=p.d;p.pivot=new THREE.Group();p.pivot.rotation.y=R()*6.28;p.pivot.add(p.holder);scene.add(p.pivot);
+  const pts=[];for(let i=0;i<=128;i++){const a=i/128*6.2832;pts.push(new THREE.Vector3(Math.cos(a)*p.d,0,Math.sin(a)*p.d))}
+  lines.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts),new THREE.LineBasicMaterial({color:0x8890c0,transparent:true,opacity:.3})))}else scene.add(p.holder);
+ if(p.moon){p.mp=new THREE.Group();const m=new THREE.Mesh(new THREE.SphereGeometry(.3,24,16),new THREE.MeshStandardMaterial({color:"#b5b5b5",roughness:1}));m.position.x=2.4;p.mp.add(m);p.holder.add(p.mp)}
+ if(p.ring){const a=p.r*1.35,b=p.r*2.3,rg=new THREE.RingGeometry(a,b,96),pos=rg.attributes.position,uv=rg.attributes.uv,v=new THREE.Vector3();
+  for(let i=0;i<pos.count;i++){v.fromBufferAttribute(pos,i);uv.setXY(i,(v.length()-a)/(b-a),0)}
+  const c=document.createElement("canvas");c.width=256;c.height=4;const x=c.getContext("2d");
+  for(let i=0;i<256;i++){let al=(Math.sin(i*.35)*.5+.5)*.6+.25;if(i>150&&i<166)al=.04;x.fillStyle=`rgba(225,205,165,${al})`;x.fillRect(i,0,1,4)}
+  const r=new THREE.Mesh(rg,new THREE.MeshBasicMaterial({map:new THREE.CanvasTexture(c),transparent:true,side:THREE.DoubleSide}));r.rotation.x=Math.PI/2;p.holder.add(r)}});
+const gc=document.createElement("canvas");gc.width=gc.height=128;{const x=gc.getContext("2d"),g=x.createRadialGradient(64,64,0,64,64,64);g.addColorStop(0,"rgba(255,200,90,.9)");g.addColorStop(.35,"rgba(255,140,30,.35)");g.addColorStop(1,"rgba(255,100,0,0)");x.fillStyle=g;x.fillRect(0,0,128,128)}
+const glow=new THREE.Sprite(new THREE.SpriteMaterial({map:new THREE.CanvasTexture(gc),blending:THREE.AdditiveBlending,depthWrite:false}));glow.scale.set(42,42,1);scene.add(glow);
+function cloud(n,f,size,col){const a=new Float32Array(n*3);for(let i=0;i<n;i++){const[x,y,z]=f();a[i*3]=x;a[i*3+1]=y;a[i*3+2]=z}const g=new THREE.BufferGeometry();g.setAttribute("position",new THREE.BufferAttribute(a,3));return new THREE.Points(g,new THREE.PointsMaterial({color:col,size,sizeAttenuation:false}))}
+scene.add(cloud(3000,()=>{const u=R()*6.283,v=Math.acos(2*R()-1),r=900+R()*300;return[r*Math.sin(v)*Math.cos(u),r*Math.sin(v)*Math.sin(u),r*Math.cos(v)]},1.6,0xffffff));
+const belt=cloud(2200,()=>{const a=R()*6.283,r=39+R()*8;return[Math.cos(a)*r,(R()-.5)*2.2,Math.sin(a)*r]},1.8,0x9b9385);scene.add(belt);
+// ---- camera flights ----
+let focus=null,tw=null,speed=1;
+function limits(){if(focus){controls.minDistance=focus.r*1.5;controls.maxDistance=focus.r*10;controls.autoRotate=false}else{controls.minDistance=20;controls.maxDistance=500;controls.autoRotate=true}}
+function fly(pos,tgt){controls.enabled=false;controls.minDistance=0;controls.maxDistance=1e4;controls.autoRotate=false;tw={t:0,p0:camera.position.clone(),p1:pos,q0:controls.target.clone(),q1:tgt}}
+function visit(p){if(fl&&fl.p===p)endFloat();focus=p;const w=new THREE.Vector3();p.holder.getWorldPosition(w);let c;
+ if(p.d){c=w.clone().multiplyScalar(1-(p.r*(p.ring?5:3.6))/w.length());c.y+=p.r*.8}else c=new THREE.Vector3(0,p.r*.6,p.r*3.2);
+ fly(c,w);show(p);mark()}
+function home(){focus=null;$("info").classList.remove("show");fly(ov(),new THREE.Vector3());mark()}
+camera.position.copy(ov());limits();
+// ---- ui ----
+function show(p){$("nm").textContent=p.n;$("tag").textContent=p.tag;$("tx").textContent=p.t;$("fun").textContent=p.f;
+ $("st").innerHTML=L.map((l,i)=>`<div><dt>${l}</dt><dd>${p.st[i]}</dd></div>`).join("");wt();$("info").classList.add("show");$("info").scrollTop=0}
+function wt(){if(focus)$("wr").textContent=`= ${((+$("kg").value||0)*focus.g).toFixed(1)} kg on ${focus.n}`}
+$("kg").oninput=wt;$("back").onclick=home;addEventListener("keydown",e=>{if(e.key=="Escape"&&focus)home()});
+const ch=$("chips");P.forEach(p=>{const b=document.createElement("button");b.innerHTML=`<i style="background:${p.tx[0]}"></i>${p.n}`;b.onclick=()=>visit(p);p.chip=b;ch.append(b)});
+{const b=document.createElement("button");b.textContent="🎲 Surprise me";b.onclick=()=>visit(P[Math.floor(R()*P.length)]);ch.append(b)}
+const mark=()=>{P.forEach(p=>p.chip.classList.toggle("on",p===focus));updateFlt()};
+function updateFlt(){const b=$("flt");b.hidden=!(fl||focus);b.textContent=fl?"Put planet back":"Float this planet"}
+$("flt").onclick=()=>{if(fl)endFloat();else if(focus)floatPlanet(focus,LR.x+LR.w/2,LR.y+LR.h/2)};
+function setSpeed(v){speed=v;$("spd").value=v;$("sv").textContent="×"+v}$("spd").oninput=e=>setSpeed(+e.target.value);
+$("orb").onclick=e=>{const on=e.target.getAttribute("aria-pressed")!="true";e.target.setAttribute("aria-pressed",on);lines.visible=on};
+// ---- picking ----
+const ray=new THREE.Raycaster(),m2=new THREE.Vector2(),stage=$("stage");let down=null;
+function pick(e){const r=stage.getBoundingClientRect();if(e.clientX<r.left||e.clientX>r.right||e.clientY<r.top||e.clientY>r.bottom)return null;
+ m2.set((e.clientX-r.left)/r.width*2-1,-((e.clientY-r.top)/r.height)*2+1);ray.setFromCamera(m2,camera);
+ const h=ray.intersectObjects(P.filter(p=>p.holder.visible).map(p=>p.mesh))[0];return h&&P.find(p=>p.mesh==h.object)}
+stage.addEventListener("pointerdown",e=>down=[e.clientX,e.clientY]);
+stage.addEventListener("pointerup",e=>{if(down&&Math.hypot(e.clientX-down[0],e.clientY-down[1])<6&&!focus){const p=pick(e);if(p)visit(p)}down=null});
+stage.addEventListener("pointermove",e=>{if(e.pointerType=="touch"||focus||e.buttons){$("tip").style.display="none";return}const p=pick(e);stage.style.cursor=p?"pointer":"";const t=$("tip");t.style.display=p?"block":"none";if(p){t.textContent=p.n;t.style.left=e.clientX+14+"px";t.style.top=e.clientY+14+"px"}});
+// ---- floating planet (rendered over the camera pane) ----
+fs.add(new THREE.AmbientLight(0xffffff,.75));{const dl=new THREE.DirectionalLight(0xffffff,1.1);dl.position.set(-3,4,6);fs.add(dl)}
+const aura=new THREE.Sprite(new THREE.SpriteMaterial({map:glow.material.map,blending:THREE.AdditiveBlending,depthWrite:false,opacity:.45,color:0x66ccff}));aura.visible=false;fs.add(aura);
+const HALF=Math.tan(20*Math.PI/180)*10;let fl=null;
+const px2w=(x,y)=>({x:(x/innerWidth-.5)*2*HALF*fcam.aspect,y:(.5-y/innerHeight)*2*HALF});
+function floatPlanet(p,x,y){endFloat();const g=p.holder.clone(true);g.position.set(0,0,0);g.visible=true;fs.add(g);p.holder.visible=false;if(!p.d)glow.visible=false;
+ fl={p,g,x,y,k:1,t:0,rad:100};aura.visible=true;stepFloat(0);updateFlt()}
+function endFloat(){if(!fl)return;fs.remove(fl.g);fl.p.holder.visible=true;if(!fl.p.d)glow.visible=true;fl=null;aura.visible=false;updateFlt()}
+function stepFloat(dt){fl.t+=dt;const q=fl.p,wr=(q.ring?85:q.d?115:100)*fl.k;fl.rad=wr;const r=wr/(innerHeight/2)*HALF,w=px2w(fl.x,fl.y+Math.sin(fl.t*2)*6);
+ fl.g.position.set(w.x,w.y,0);fl.g.scale.setScalar(r/q.r);fl.g.children[0].rotation.y+=dt*.7;aura.position.set(w.x,w.y,-1);aura.scale.setScalar(r*5)}
+function draw(){const W=innerWidth,H=innerHeight;renderer.autoClear=false;renderer.setScissorTest(false);renderer.setViewport(0,0,W,H);renderer.clear();
+ const y=H-SR.y-SR.h;renderer.setScissorTest(true);renderer.setViewport(SR.x,y,SR.w,SR.h);renderer.setScissor(SR.x,y,SR.w,SR.h);renderer.render(scene,camera);
+ if(fl){renderer.setScissorTest(false);renderer.setViewport(0,0,W,H);renderer.clearDepth();renderer.render(fs,fcam)}}
+// ---- loop ----
+const clock=new THREE.Clock();
+(function tick(){requestAnimationFrame(tick);const dt=Math.min(clock.getDelta(),.05),od=focus?0:dt*speed;
+ P.forEach(p=>{if(p.pivot)p.pivot.rotation.y+=od*p.w;p.mesh.rotation.y+=dt*p.spin;if(p.mp)p.mp.rotation.y+=dt*(.6+speed*.6)});belt.rotation.y+=od*.05;
+ if(tw){tw.t=Math.min(1,tw.t+dt/1.8);const e=tw.t<.5?4*tw.t**3:1-Math.pow(-2*tw.t+2,3)/2;camera.position.lerpVectors(tw.p0,tw.p1,e);controls.target.lerpVectors(tw.q0,tw.q1,e);
+  if(tw.t>=1){tw=null;controls.enabled=true;limits()}}
+ if(fl)stepFloat(dt);controls.update();draw()})();
+</script>
+<script type="module">
+import {HandLandmarker,FilesetResolver} from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/vision_bundle.mjs";
+const vid=$("vid"),pc=$("pc").getContext("2d"),cur=$("cur"),gs=$("gest"),sph=new THREE.Spherical(),off=new THREE.Vector3();
+const CONN=[[0,1],[1,2],[2,3],[3,4],[0,5],[5,6],[6,7],[7,8],[5,9],[9,10],[10,11],[11,12],[9,13],[13,14],[14,15],[15,16],[13,17],[17,18],[18,19],[19,20],[0,17]],TIPS=[4,8,12,16,20];
+let hl=null,last=-1,pin=[false,false],sm=null,hold=null,zoom=null,prevP=false,fistT=0,peaceT=0,palmT=0,dwell=null,cool=0,handsOn=false;
+const clamp01=v=>Math.min(1,Math.max(0,.5+(v-.5)*1.3)),inS=p=>p.x>=SR.x&&p.x<=SR.x+SR.w&&p.y>=SR.y&&p.y<=SR.y+SR.h;
+const cover=(nx,ny)=>{const vw=vid.videoWidth||640,vh=vid.videoHeight||480,k=Math.max(LR.w/vw,LR.h/vh);return{x:LR.w/2+(.5-nx)*vw*k,y:LR.h/2+(ny-.5)*vh*k}};
+function drawHands(hands){const d=devicePixelRatio||1;pc.setTransform(d,0,0,d,0,0);pc.clearRect(0,0,LR.w,LR.h);
+ hands.forEach(l=>{const q=l.map(m=>cover(m.x,m.y));pc.strokeStyle="rgba(255,255,255,.6)";pc.lineWidth=2;pc.beginPath();CONN.forEach(([a,b])=>{pc.moveTo(q[a].x,q[a].y);pc.lineTo(q[b].x,q[b].y)});pc.stroke();
+  q.forEach((p,i)=>{const t=TIPS.includes(i);pc.fillStyle=t?"#ff7a1a":"#00e5ff";pc.beginPath();pc.arc(p.x,p.y,t?6:3.5,0,7);pc.fill()})})}
+function orbitBy(dx,dy){off.copy(camera.position).sub(controls.target);sph.setFromVector3(off);sph.theta-=dx/SR.w*5;sph.phi=Math.min(3.09,Math.max(.05,sph.phi-dy/SR.h*3));off.setFromSpherical(sph);camera.position.copy(controls.target).add(off)}
+function zoomTo(len){off.copy(camera.position).sub(controls.target);off.setLength(Math.min(controls.maxDistance,Math.max(controls.minDistance,len)));camera.position.copy(controls.target).add(off)}
+const setCur=(p,on)=>{cur.style.display="block";cur.style.left=p.x+"px";cur.style.top=p.y+"px";cur.classList.toggle("pin",on)};
+function handle(hands){drawHands(hands);
+ const info=hands.map((l,i)=>{const sz=Math.hypot(l[0].x-l[9].x,l[0].y-l[9].y)||.1,d=(a,b)=>Math.hypot(l[a].x-l[b].x,l[a].y-l[b].y)/sz,
+  P=j=>({x:clamp01(1-l[j].x)*innerWidth,y:clamp01(l[j].y)*innerHeight}),a=P(4),b=P(8),dp=d(4,8),ext=(t,p)=>d(t,0)>d(p,0)*1.15,f=[ext(8,6),ext(12,10),ext(16,14),ext(20,18)];
+  const fist=f.every(x=>!x);pin[i]=!fist&&(dp<.3||(pin[i]&&dp<.5));
+  return{pinch:pin[i],fist,point:f[0]&&!f[1]&&!f[2]&&!f[3]&&!pin[i],palm:f.every(Boolean)&&d(4,17)>d(3,17)&&dp>.5,peace:f[0]&&f[1]&&!f[2]&&!f[3],pt:pin[i]?{x:(a.x+b.x)/2,y:(a.y+b.y)/2}:b}});
+ const t=performance.now();
+ if(!info.length){sm=null;hold=null;zoom=null;prevP=false;fistT=peaceT=palmT=0;dwell=null;cur.style.display="none";$("tip").style.display="none";gs.textContent="Show your hand to the camera";return}
+ const[A,B]=info;
+ if(info.length==2&&A.pinch&&B.pinch){hold=null;prevP=true;const m={x:(A.pt.x+B.pt.x)/2,y:(A.pt.y+B.pt.y)/2},d=Math.hypot(A.pt.x-B.pt.x,A.pt.y-B.pt.y)||1;
+  if(!zoom)zoom={d,len:camera.position.distanceTo(controls.target),k:fl?fl.k:1};
+  else if(fl&&!inS(m)){fl.k=Math.min(3,Math.max(.4,zoom.k*d/zoom.d));gs.textContent="Resizing the floating planet"}
+  else if(!tw){zoomTo(zoom.len*zoom.d/d);gs.textContent="Zoom: spread or close your hands"}
+  setCur(m,true);return}
+ zoom=null;const h=A;sm=sm?{x:sm.x+(h.pt.x-sm.x)*.5,y:sm.y+(h.pt.y-sm.y)*.5}:h.pt;setCur(sm,h.pinch);
+ const over=!focus&&!tw&&!h.pinch?pick({clientX:sm.x,clientY:sm.y}):null,tip=$("tip");
+ tip.style.display=over?"block":"none";if(over){tip.textContent=over.n;tip.style.left=sm.x+22+"px";tip.style.top=sm.y+22+"px"}
+ if(h.pinch){fistT=peaceT=palmT=0;dwell=null;cur.style.background="";
+  if(!prevP){if(fl&&Math.hypot(sm.x-fl.x,sm.y-fl.y)<fl.rad+30)hold={k:"float"};
+   else{const p=tw?null:pick({clientX:sm.x,clientY:sm.y});hold=p?{k:"planet",p,x:sm.x,y:sm.y}:inS(sm)?{k:"rot",x:sm.x,y:sm.y}:null}}
+  if(hold){const dx=sm.x-(hold.x??sm.x),dy=sm.y-(hold.y??sm.y);
+   if(hold.k=="float"){fl.x=sm.x;fl.y=sm.y;gs.textContent="Carrying the planet. Release on the right to put it back"}
+   else if(hold.k=="planet"&&!inS(sm)){floatPlanet(hold.p,sm.x,sm.y);hold={k:"float"};gs.textContent="Floating in your camera!"}
+   else if(hold.k=="rot"||(hold.k=="planet"&&focus===hold.p)){if(!tw)orbitBy(dx,dy);gs.textContent="Rotating"}
+   else gs.textContent="Drag the planet left onto your camera";
+   if(hold.x!==undefined){hold.x=sm.x;hold.y=sm.y}}}
+ else{if(prevP){if(hold&&hold.k=="float"&&inS(sm))endFloat();hold=null}
+  if(h.point&&over){if(!dwell||dwell.p!==over)dwell={p:over,t0:t};const pr=Math.min(1,(t-dwell.t0)/350);cur.style.background=`conic-gradient(#ff7a1a ${pr*360}deg,transparent 0)`;gs.textContent="Pointing at "+over.n+"…";
+   if(pr>=1&&t>cool){cool=t+800;dwell=null;cur.style.background="";visit(over)}}
+  else{dwell=null;cur.style.background=""}
+  if(h.fist&&focus&&!tw){fistT=fistT||t;const pr=(t-fistT)/800;gs.textContent="Hold fist to return… "+Math.round(Math.min(1,pr)*100)+"%";if(pr>=1){fistT=0;home()}}else fistT=0;
+  if(h.peace&&!tw){peaceT=peaceT||t;gs.textContent="Peace sign: next planet…";if(t-peaceT>450&&t>cool){cool=t+1800;peaceT=0;visit(focus?P[(P.indexOf(focus)+1)%P.length]:P[1+Math.floor(Math.random()*8)])}}else peaceT=0;
+  if(h.palm&&!focus&&!tw){palmT=palmT||t;gs.textContent="Open palm: pause or resume time…";if(t-palmT>700&&t>cool){cool=t+1500;palmT=0;setSpeed(speed?0:1)}}else palmT=0;
+  if(!h.fist&&!h.peace&&!h.palm&&!(h.point&&over))gs.textContent=focus?"Pinch and drag to rotate · fist to go back":"Point at a planet · or pinch one and drag it left"}
+ prevP=h.pinch}
+(function loop(){if(handsOn&&hl&&vid.readyState>=2&&vid.currentTime!==last){last=vid.currentTime;handle(hl.detectForVideo(vid,performance.now()).landmarks||[])}
+ if(handsOn&&!tw)controls.autoRotate=!focus&&!hold&&!zoom;requestAnimationFrame(loop)})();
+$("skip").onclick=()=>{$("start").style.display="none"};
+$("go").onclick=async()=>{$("start").style.display="none";gs.textContent="Loading hand model…";
+ try{const fs=await FilesetResolver.forVisionTasks("https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm");
+  hl=await HandLandmarker.createFromOptions(fs,{baseOptions:{modelAssetPath:"https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task",delegate:"GPU"},runningMode:"VIDEO",numHands:2});
+  vid.srcObject=await navigator.mediaDevices.getUserMedia({video:{facingMode:"user",width:{ideal:1280},height:{ideal:720}}});await vid.play();handsOn=true;gs.textContent="Show your hand to the camera"}
+ catch(e){gs.textContent="Camera unavailable: use mouse or touch"}};
+</script>
+</body></html>
