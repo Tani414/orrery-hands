@@ -2,7 +2,7 @@
 
 Explore the solar system with nothing but your webcam and your hands. Point at a planet to fly to it, rotate it in 3D, read about it, and even pull it out of the screen to make it float in front of your own camera feed.
 
-**Live demo:** https://yourusername.github.io/orrery-hands/
+**Live demo:** https://orrery-hands-juu92lbdr-tani415.vercel.app/
 
 <!-- Add a screenshot or GIF here: ![Orrery demo](docs/demo.gif) -->
 
